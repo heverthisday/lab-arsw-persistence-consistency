@@ -1,0 +1,10 @@
+=== EXP1 dos pestañas (HTTP) 2026-10-30T21:43:37-05:00
+version leida por ambas pestañas: 1
+--- PUT como ana (expected_version=1)
+{"id":"board-1","title":"Edicion de ana","version":2,"preferences":{"background":"white"}}
+HTTP 200
+--- PUT como luis (expected_version=1)
+{"detail":"Versión obsoleta o tablero inexistente: recargue antes de editar"}
+HTTP 409
+--- estado final
+{"id":"board-1","title":"Edicion de ana","version":2,"preferences":{"background":"white"}}

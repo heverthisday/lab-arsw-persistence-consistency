@@ -1,0 +1,15 @@
+{
+  "mode": "redis-down",
+  "utc": "2026-10-31T02:40:13.946264+00:00",
+  "results": [
+    {
+      "test": "degradacion_redis",
+      "passed": false,
+      "evidence": {
+        "edit_status": 200,
+        "presence_status": 503,
+        "presence": "{\"detail\":\"Redis no disponible: implementar degradación\"}"
+      }
+    }
+  ]
+}
