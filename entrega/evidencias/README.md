@@ -22,6 +22,78 @@ Cada experimento se hizo dos veces: **ANTES** (código base, con los defectos) y
 
 `acceptance` con el código arreglado: **4 de 4 `passed: true`** y código de salida 0.
 
+### 1.1 Las evidencias más importantes (versión corta)
+
+Si solo van a mirar algo, que sea esto. Cada recorte muestra la **hora**, si es ANTES o DESPUÉS
+y **lo que respondió el servidor** (`HTTP …`). Las capturas completas y el procedimiento
+están más abajo, en la sección 4.
+
+**① Dos personas editan a la vez** (detalle: Paso 4)
+
+| ANTES | DESPUÉS |
+|---|---|
+| <img src="capturas/clave/clave-1-edicion-perdida-antes.png" width="440"> | <img src="capturas/clave/clave-1-edicion-perdida-despues.png" width="440"> |
+
+**En simple:** antes, Luis también guardaba (200) y el cambio de Ana se perdía sin que nadie se enterara.
+Ahora Luis recibe **409**: el sistema ve que tenía una versión vieja y **no pisa** el cambio de otro.
+El 409 es un rechazo correcto, no una falla del servidor.
+
+**② Le quitan el permiso a Luis** (detalle: Paso 5)
+
+| ANTES | DESPUÉS |
+|---|---|
+| <img src="capturas/clave/clave-2-permiso-revocado-antes.png" width="440"> | <img src="capturas/clave/clave-2-permiso-revocado-despues.png" width="440"> |
+
+**En simple:** antes, Luis guardaba aunque ya no tenía permiso, porque la caché todavía decía que sí.
+Ahora recibe **403**: para guardar, el servidor le pregunta a Gestión y no confía en la caché.
+
+**③ La presencia debe desaparecer a los 20 s** (detalle: Paso 6)
+
+| ANTES | DESPUÉS |
+|---|---|
+| <img src="capturas/clave/clave-3-presencia-20s-antes.png" width="440"> | <img src="capturas/clave/clave-3-presencia-20s-despues.png" width="440"> |
+
+**En simple:** antes, 22 segundos después Ana **seguía en línea** (nunca se borraba).
+Ahora la lista queda **vacía**: se borra sola a los 20 s.
+
+**④ Redis apagado** (detalle: Paso 7)
+
+| ANTES | DESPUÉS |
+|---|---|
+| <img src="capturas/clave/clave-4-redis-caido-antes.png" width="440"> | <img src="capturas/clave/clave-4-redis-caido-despues.png" width="440"> |
+
+**En simple:** antes, apagar Redis hacía fallar el heartbeat con **503**, aunque solo es una función opcional.
+Ahora responde **200 con `available: false`**: se pierde la presencia, pero todo lo demás sigue funcionando (también se puede editar).
+Ojo: la respuesta tardó ≈ 4 s.
+
+**⑤ Gestión (la que confirma permisos) apagada** (detalle: Paso 8)
+
+| ANTES | DESPUÉS |
+|---|---|
+| <img src="capturas/clave/clave-5-gestion-caida-antes.png" width="440"> | <img src="capturas/clave/clave-5-gestion-caida-despues.png" width="440"> |
+
+**En simple:** antes, el sistema guardaba (200) con un permiso viejo de la caché, aunque **nadie pudo confirmarlo**.
+Ahora responde **503 y no guarda**: preferimos rechazar a dejar escribir sin verificar.
+
+**⑥ Lo que se ve en Grafana** (ventana 22:05:00 – 22:08:40; detalle: sección 5)
+
+<img src="capturas/grafana-5-despues-corregido.png" width="760">
+
+**En simple:** cuando Redis o Gestión se apagan, el panel **Dependencias** baja a 0 aunque `up` sigue en 1
+(el servicio está vivo, pero le falta algo). También suben **Conflictos** (los 409) y **Presencia degradada**.
+Los **errores 5xx** solo suben cuando cae Gestión (los 503 que hicimos a propósito); un 409 o un 403 no cuentan como error técnico.
+
+**⑦ Pruebas automáticas y SQL**
+
+| Prueba | Resultado |
+|---|---|
+| `acceptance` (arranque, ediciones concurrentes, permiso revocado, presencia que expira) | **4 de 4 `passed: true`**, código 0 (`06-acceptance-corregido.json` y `11-acceptance-final.json`) |
+| SQL: cambio dentro de `BEGIN` y luego `ROLLBACK` | Dentro: `f` → después: `t` (el cambio se deshizo) |
+| SQL: repetir una membresía | `ERROR: duplicate key … "memberships_pkey"` (la clave primaria lo impide) |
+| SQL: membresía de un usuario que no existe | `ERROR: … foreign key constraint "memberships_user_id_fkey"` (la clave foránea lo impide) |
+
+**En simple:** los tres arreglos pasan las pruebas, y la base de datos rechaza por sí sola los datos mal formados.
+
 ---
 
 ## 2. Entorno
